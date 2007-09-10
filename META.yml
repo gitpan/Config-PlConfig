@@ -1,0 +1,38 @@
+---
+name: Config-PlConfig
+version: 0.1_01
+author:
+  - 'Ask Solem <ASKSH@cpan.org>'
+abstract: Maintain a single place for configuration files.
+license: perl
+resources:
+  license: http://dev.perl.org/licenses/
+requires:
+  Class::Dot: 0
+  File::HomeDir: 0
+  YAML::Syck: 0
+  version: 0
+build_requires:
+  Test::Simple: 0.42
+dynamic_config: 0
+provides:
+  Config::PlConfig:
+    file: lib/Config/PlConfig.pm
+    version: v0.1_01
+  Config::PlConfig::Constants:
+    file: lib/Config/PlConfig/Constants.pm
+    version: v0.1_01
+  Config::PlConfig::Host::Base:
+    file: lib/Config/PlConfig/Host/Base.pm
+    version: v0.1_01
+  Config::PlConfig::Host::Global:
+    file: lib/Config/PlConfig/Host/Global.pm
+    version: v0.1_01
+  Config::PlConfig::Host::Local:
+    file: lib/Config/PlConfig/Host/Local.pm
+    version: v0.1_01
+generated_by: Module::Build version 0.2808
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.2.html
+  version: 1.2
+distribution_type: Module

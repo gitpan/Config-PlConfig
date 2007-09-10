@@ -1,0 +1,25 @@
+Build.PL
+Changes
+devel/curversion
+devel/grepversion.sh
+devel/incrementversion.sh
+lib/Config/PlConfig.pm
+lib/Config/PlConfig/Constants.pm
+lib/Config/PlConfig/Host/.Base.pm.swp
+lib/Config/PlConfig/Host/Base.pm
+lib/Config/PlConfig/Host/Global.pm
+lib/Config/PlConfig/Host/Local.pm
+Makefile.PL
+MANIFEST			This list of files
+META.yml
+README
+t/00-Kwalitee.t
+t/00-YAML-META_valid.t
+t/01-plconfig.t
+t/02-host.t
+t/perlcritic.t
+t/perlcriticrc
+t/pod-coverage.t.disabled
+t/pod-spell.t
+t/pod.t
+t/stopwords-asksh.txt
