@@ -10,7 +10,7 @@ use strict;
 use 5.006001;
 use Carp;
 use English qw( -no_match_vars );
-use version; our $VERSION = qv('0.1_01');
+use version; our $VERSION = qv('0.1_02');
 use base 'Config::PlConfig::Host::Base';
 {
     my %GLOBAL_DATADIR_FOR_OS = (
@@ -50,7 +50,7 @@ Config::PlConfig - [One line description of module's purpose here]
 
 =head1 VERSION
 
-This document describes Config::PlConfig version 0.1_01
+This document describes Config::PlConfig version 0.1_02
 
 
 =head1 SYNOPSIS

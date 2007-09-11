@@ -7,12 +7,16 @@ WriteMakefile
           'PREREQ_PM' => {
                            'Class::Dot' => '0',
                            'File::HomeDir' => '0',
+                           'Params::Util' => '0',
                            'Test::Simple' => '0.42',
                            'YAML::Syck' => '0',
                            'version' => '0'
                          },
           'INSTALLDIRS' => 'site',
-          'EXE_FILES' => [],
+          'EXE_FILES' => [
+                           '/opt/devel/Config-PlConfig/bin/OLD',
+                           '/opt/devel/Config-PlConfig/bin/pldefaults'
+                         ],
           'PL_FILES' => {}
         )
 ;

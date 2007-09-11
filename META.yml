@@ -1,6 +1,6 @@
 ---
 name: Config-PlConfig
-version: 0.1_01
+version: 0.1_02
 author:
   - 'Ask Solem <ASKSH@cpan.org>'
 abstract: Maintain a single place for configuration files.
@@ -10,6 +10,7 @@ resources:
 requires:
   Class::Dot: 0
   File::HomeDir: 0
+  Params::Util: 0
   YAML::Syck: 0
   version: 0
 build_requires:
@@ -18,18 +19,24 @@ dynamic_config: 0
 provides:
   Config::PlConfig:
     file: lib/Config/PlConfig.pm
-    version: v0.1_01
+    version: v0.1_02
   Config::PlConfig::Constants:
     file: lib/Config/PlConfig/Constants.pm
-    version: v0.1_01
+    version: v0.1_02
+  Config::PlConfig::DotScheme:
+    file: lib/Config/PlConfig/DotScheme.pm
+    version: v0.1_02
   Config::PlConfig::Host::Base:
     file: lib/Config/PlConfig/Host/Base.pm
-    version: v0.1_01
+    version: v0.1_02
   Config::PlConfig::Host::Global:
     file: lib/Config/PlConfig/Host/Global.pm
-    version: v0.1_01
+    version: v0.1_02
   Config::PlConfig::Host::Local:
     file: lib/Config/PlConfig/Host/Local.pm
+    version: v0.1_02
+  Config::PlConfig::Tied:
+    file: lib/Config/PlConfig/Tied.pm
     version: v0.1_01
 generated_by: Module::Build version 0.2808
 meta-spec:

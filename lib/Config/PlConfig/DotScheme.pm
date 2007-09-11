@@ -4,151 +4,151 @@
 # $HeadURL$
 # $Revision$
 # $Date$
-package Config::PlConfig;
+package Config::PlConfig::DotScheme;
+
 use warnings;
 use strict;
 use 5.006001;
-use Carp;
 use version; our $VERSION = qv('0.1_02');
 {
 
-    use Class::Dot   qw(property isa_String isa_Data isa_Hash isa_Int isa_Object);
-    use Config::PlConfig::Constants;
-    use Config::PlConfig::Host::Local;
-    use Config::PlConfig::Host::Global;
-    use Config::PlConfig::DotScheme;
-    use YAML::Syck   qw(LoadFile DumpFile);
+    use Carp;
+    use Class::Dot qw(-new property isa_String isa_Object);
     use Params::Util qw(_CODELIKE);
-    
-    my %HOST_TO_CLASS = (
-        'local'     => 'Config::PlConfig::Host::Local',
-        'global'    => 'Config::PlConfig::Host::Global',
-    );
+    use English qw( -no_match_vars );
 
-    property domain     => isa_String('system.DEFAULT');
-    property host       => isa_Data();
-    property options    => isa_Hash();
-    property config     => isa_Hash();
-    property autosave   => isa_Int(0);
-    property dotscheme  => isa_Object;
+    property plconfig => isa_Object('Config::PlConfig');
+    property dumper   => isa_String('JSON');
 
     my $GLOBAL_AUTOSAVE = 0;
 
-    my %EXPORT_TAGS     = (
-        ':autosave'         => sub {
-            $GLOBAL_AUTOSAVE = 1;
+    my %DUMPER = (
+        'YAML' => sub {
+            require YAML::Syck;
+            return YAML::Syck::Dump(@_);
+        },
+        'XML' => sub {
+            require XML::Simple;
+            return XML::Simple::XMLout(@_);
+        },
+        'JSON' => sub {
+            require JSON::Syck;
+            return JSON::Syck::Dump(@_);
         },
     );
-    
-    sub import {
-        shift;
-        return if not scalar @_;
-        my $caller = caller 0;
 
-        ARG:
-        for my $arg (@_) {
-            if (exists $EXPORT_TAGS{$arg}) {
-                my $handler = $EXPORT_TAGS{$arg};
-                if (_CODELIKE($handler)) {
-                    $handler->($caller);
-                }
-                next ARG;
-            }
-            require Carp;
-            my @msg = "No such export tag: $arg.";
-            my $alt = ":$arg";
-            if ($EXPORT_TAGS{$alt}) {
-                push @msg, "Did you mean $alt?";
-            };
-            my $msg = join q{ }, @msg;
-            Carp::croak($msg);
+    sub write_key {
+        my ( $self, $key, $setvalue ) = @_;
+        my $plconfig = $self->plconfig;
+        my $config   = $plconfig->config;
+        return if !$key || !$setvalue;
+        
+        my $statement = $self->dotscheme_to_perlvar($key);
+
+        # Try to check if the string evals,
+        # if it does it's a valid perl statement,
+        # everything else is quoted with power-quotes (')
+        eval $setvalue; ## no critic
+        if ($EVAL_ERROR) {
+            $setvalue = qq{'$setvalue'};
         }
 
-        return;
-    }
-
-    sub new {
-        my ($class, $options_ref) = @_;
-        my $self = { };
-        bless $self, $class;
-
-        my $DEFAULT_HOST = Config::PlConfig::Constants->get(
-           'DEFAULT_HOST'
-        );
-
-        my $host_class = $options_ref->{host}
-                ? $HOST_TO_CLASS{ lc $options_ref->{host} }
-                : $HOST_TO_CLASS{ lc $DEFAULT_HOST        };
-        my $host = $host_class->new($options_ref);
-
-        if ($options_ref->{domain}) {
-            $self->set_domain( $options_ref->{domain} );
-        }
-
-        my $dotscheme = Config::PlConfig::DotScheme->new({
-            plconfig => $self,
-            dumper   => $options_ref->{dumper},
+        # try the statement with a temp variable first.
+        # so we're sure it doesn't fuck up something.
+        $self->eval_string(qq{
+                my \$tmpvar = $setvalue;
         });
 
-        
-        $self->set_host($host);
-        $self->set_options($options_ref);
-        $self->set_dotscheme($dotscheme);
+        # then try the real operation
+        $self->eval_string(qq{
+                $statement = $setvalue;
+        });
 
-        $self->load( );
-    
-        return $self;
+        $plconfig->save;
+
+        return 1;
     }
 
-    sub get {
+    sub read_keys {
         my ($self, $key) = @_;
-        my $config       = $self->config;
+        my $plconfig = $self->plconfig;
+        my $config   = $plconfig->config;
 
-        return $config->{$key};
-    }
+        if ( defined $key ) {
+            print "KEY HOOPA\n";
+            my $statement = $self->dotscheme_to_perlvar($key);
+            my $value;
+            eval qq{ \$value = $statement }; ## no critic
+            print "-----\n", qq{ \$value = $statement }, "\n----\n";
 
-    sub load {
-        my ($self) = @_;
-        my $host   = $self->host;
-        my $domain = $self->domain;
-        my $cfile  = $host->file_for_domain($domain);
-
-        if (! -f $cfile) {
-            return;
+            return $self->dump_structure( { $key => $value } );
         }
+        
+        return $self->dump_structure($config);
 
-        my $config_ref = YAML::Syck::LoadFile($cfile);
-        $self->set_config($config_ref);
-
-        return $config_ref;
     }
 
-    sub save {
-        my ($self, $opt_config) = @_;
-        my $host   = $self->host;
-        my $domain = $self->domain;
-        my $config = $self->config;
-        my $cfile  = $host->file_for_domain($domain);
+    sub rename_key {
+        my ( $self, $domain, $key_from, $key_to ) = @_;
+        my $plconfig = $self->plconfig;
+        my $config   = $plconfig->config;
+        return if !$key_from || !$key_to;
 
-        if ($opt_config) {
-            $config = $opt_config;
-        }
+        my $from_stmt = $self->dotscheme_to_perlvar($key_from);
+        my $to_stmt   = $self->dotscheme_to_perlvar($key_to);
 
-        return YAML::Syck::DumpFile($cfile, $config);
+        $self->eval_string(
+          qq{ my \$tmp = $from_stmt; $to_stmt = \$tmp; delete $from_stmt}
+        );
+
+        $plconfig->save;
+
+        return 1;
     }
 
-    sub DEMOLISH {
-        my ($self) = @_;
+    sub delete_key {
+        my ( $self, $domain, $key ) = @_;
+        my $plconfig = $self->plconfig;
+        my $config   = $plconfig->config;
+        return if !$key;
 
-        if ($GLOBAL_AUTOSAVE || $self->autosave) {
-            $self->save( );
-        }
+        my $key_stmt = $self->dotscheme_to_perlvar($key);
 
-        return;
+        $self->eval_string(qq{ delete $key_stmt });
+
+        $plconfig->save;
+
+        return 1;
     }
+
+    sub eval_string {
+        my ($self, $perl_code) = @_;
+        my $plconfig = $self->plconfig;
+        my $config   = $plconfig->config;
+        eval $perl_code;    ## no critic
+        return $EVAL_ERROR;
+    }
+
+    sub dump_structure {
+        my ($self, $data_ref) = @_;
+        my $curdumper         = $self->dumper;
+
+        return $DUMPER{$curdumper}->($data_ref);
+    }
+
+    sub dotscheme_to_perlvar {
+        my ( $self, $key ) = @_;
+
+        my @keys = split m/\.|\-\>/xms, $key;
+        my $statement = q{$} . 'config->';
+        $statement .= join q{}, map {"{'$_'}"} @keys;
+
+        return $statement;
+    }
+
 }
 
-1; # Magic true value required at end of module
+1;    # Magic true value required at end of module
 __END__
 
 =head1 NAME

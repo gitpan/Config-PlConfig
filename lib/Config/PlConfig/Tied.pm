@@ -4,144 +4,90 @@
 # $HeadURL$
 # $Revision$
 # $Date$
-package Config::PlConfig;
+package Config::PlConfig::Tied;
+
 use warnings;
 use strict;
 use 5.006001;
-use Carp;
-use version; our $VERSION = qv('0.1_02');
+use version; our $VERSION = qv('0.1_01');
 {
+    use Carp;
+    use Class::Dot   qw(-new property isa_Object isa_Hash isa_Int);
+    use NEXT;
 
-    use Class::Dot   qw(property isa_String isa_Data isa_Hash isa_Int isa_Object);
-    use Config::PlConfig::Constants;
-    use Config::PlConfig::Host::Local;
-    use Config::PlConfig::Host::Global;
-    use Config::PlConfig::DotScheme;
-    use YAML::Syck   qw(LoadFile DumpFile);
-    use Params::Util qw(_CODELIKE);
-    
-    my %HOST_TO_CLASS = (
-        'local'     => 'Config::PlConfig::Host::Local',
-        'global'    => 'Config::PlConfig::Host::Global',
-    );
+    require Tie::Hash;
+    @Config::PlConfig::Tied::ISA = qw(Tie::StdHash );
 
-    property domain     => isa_String('system.DEFAULT');
-    property host       => isa_Data();
-    property options    => isa_Hash();
-    property config     => isa_Hash();
-    property autosave   => isa_Int(0);
-    property dotscheme  => isa_Object;
+    property autosave => isa_Int(1);
+    property plconfig => isa_Object('Config::PlConfig');
+    property storage  => isa_Hash();
 
-    my $GLOBAL_AUTOSAVE = 0;
+    sub TIEHASH {
+        my ($class, $storage) = @_;
 
-    my %EXPORT_TAGS     = (
-        ':autosave'         => sub {
-            $GLOBAL_AUTOSAVE = 1;
-        },
-    );
-    
-    sub import {
-        shift;
-        return if not scalar @_;
-        my $caller = caller 0;
+        print "ASKTEST: $storage->{ask}{test}\n";
 
-        ARG:
-        for my $arg (@_) {
-            if (exists $EXPORT_TAGS{$arg}) {
-                my $handler = $EXPORT_TAGS{$arg};
-                if (_CODELIKE($handler)) {
-                    $handler->($caller);
-                }
-                next ARG;
-            }
-            require Carp;
-            my @msg = "No such export tag: $arg.";
-            my $alt = ":$arg";
-            if ($EXPORT_TAGS{$alt}) {
-                push @msg, "Did you mean $alt?";
-            };
-            my $msg = join q{ }, @msg;
-            Carp::croak($msg);
-        }
-
-        return;
-    }
-
-    sub new {
-        my ($class, $options_ref) = @_;
-        my $self = { };
-        bless $self, $class;
-
-        my $DEFAULT_HOST = Config::PlConfig::Constants->get(
-           'DEFAULT_HOST'
-        );
-
-        my $host_class = $options_ref->{host}
-                ? $HOST_TO_CLASS{ lc $options_ref->{host} }
-                : $HOST_TO_CLASS{ lc $DEFAULT_HOST        };
-        my $host = $host_class->new($options_ref);
-
-        if ($options_ref->{domain}) {
-            $self->set_domain( $options_ref->{domain} );
-        }
-
-        my $dotscheme = Config::PlConfig::DotScheme->new({
-            plconfig => $self,
-            dumper   => $options_ref->{dumper},
+        my $self = $class->new({
+            storage => $storage
         });
-
-        
-        $self->set_host($host);
-        $self->set_options($options_ref);
-        $self->set_dotscheme($dotscheme);
-
-        $self->load( );
+        $self->set_storage($storage);
     
         return $self;
     }
 
-    sub get {
-        my ($self, $key) = @_;
-        my $config       = $self->config;
+    sub FETCH {
+        my ($self, $config_key) = @_;
+        my $storage = $self->storage;
 
-        return $config->{$key};
+        return $storage->{$config_key};
     }
 
-    sub load {
-        my ($self) = @_;
-        my $host   = $self->host;
-        my $domain = $self->domain;
-        my $cfile  = $host->file_for_domain($domain);
+    sub STORE {
+        my ($self, $config_key, $config_value) = @_;
+        my $storage  = $self->storage;
+        my $plconfig = $self->plconfig;
 
-        if (! -f $cfile) {
-            return;
-        }
+        $storage->{$config_key} = $config_value;
+        $plconfig->save;
 
-        my $config_ref = YAML::Syck::LoadFile($cfile);
-        $self->set_config($config_ref);
-
-        return $config_ref;
+        return;
     }
 
-    sub save {
-        my ($self, $opt_config) = @_;
-        my $host   = $self->host;
-        my $domain = $self->domain;
-        my $config = $self->config;
-        my $cfile  = $host->file_for_domain($domain);
+    sub FIRSTKEY {
+        my $s = $_[0]->storage;
+        my $a = scalar keys %{ $s };
+        return each %{ $s };
+    }
 
-        if ($opt_config) {
-            $config = $opt_config;
-        }
+    sub NEXTKEY {
+        my $storage = $_[0]->storage;
+        my %h = %{ $storage };
+        return each %h;
+    }
 
-        return YAML::Syck::DumpFile($cfile, $config);
+    sub EXISTS {
+        return exists $_[0]->storage->{$_[1]};
+    }
+
+    sub DELETE {
+        return delete $_[0]->storage->{$_[1]};
+    }
+
+    sub CLEAR {
+        %{ $_[0]->storage } = ( );
+        return;
+    }
+
+    sub SCALAR {
+        return scalar %{ $_[0]->storage };
     }
 
     sub DEMOLISH {
-        my ($self) = @_;
+        my ($self)   = @_;
+        my $plconfig = $self->plconfig;
 
-        if ($GLOBAL_AUTOSAVE || $self->autosave) {
-            $self->save( );
+        if ($self->autosave) {
+            $plconfig->save( );
         }
 
         return;
@@ -153,12 +99,12 @@ __END__
 
 =head1 NAME
 
-Config::PlConfig - Maintain a single place for configuration files.
+Config::PlConfig::Tied - Tie your config for extra features.
 
 
 =head1 VERSION
 
-This document describes Config::PlConfig version 0.1_02
+This document describes Config::PlConfig version 0.1_01
 
 
 =head1 SYNOPSIS

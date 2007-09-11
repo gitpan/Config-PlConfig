@@ -26,7 +26,7 @@ sub NO  { 0 };
 $ENV{DEVEL_COVER_OPTIONS} = '-ignore,blib/Class/InsideOut/Policy/Modwheel.pm';
 my $builder = Module::Build->new(
     module_name          => 'Config::PlConfig',
-    dist_version        => '0.1_01',
+    dist_version        => '0.1_02',
     license              => 'perl',
     dist_author          => 'Ask Solem <ASKSH@cpan.org>',
     all_from             => 'lib/Config/PlConfig.pm',
@@ -40,6 +40,7 @@ my $builder = Module::Build->new(
         'Class::Dot'                            => 0,
         'File::HomeDir'                         => 0,
         'YAML::Syck'                            => 0,
+        'Params::Util'                          => 0,
     },
     recommends           => {
     },

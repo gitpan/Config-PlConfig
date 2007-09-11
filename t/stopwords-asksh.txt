@@ -25,3 +25,8 @@ c
 C
 LICENCE
 libgbsed.h
+API
+FreeBSD
+NetBSD
+OpenBSD
+gconf

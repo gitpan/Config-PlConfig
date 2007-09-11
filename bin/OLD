@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+# $Id$
+# $Source$
+# $Author$
+# $HeadURL$
+# $Revision$
+# $Date$
+use strict;
+use warnings;
+
+use English          qw( -no_match_vars );
+use Getopt::LL       qw(getoptions opt_String opt_Flag);
+use File::Basename   qw(basename);
+use Config::PlConfig;
+sub say_info    (@;);
+sub eval_string ($ );
+my $value;
+
+my %DUMPER = (
+    'YAML'  => sub {
+        require YAML::Syck;
+        return YAML::Syck::Dump(@_);
+    },
+    'XML'   => sub {
+        require XML::Simple;
+        return  XML::Simple::XMLout(@_);
+    },
+    'JSON'  => sub {
+        require JSON::Syck;
+        return  JSON::Syck::Dump(@_);
+    },
+);
+
+my $CURDUMPER = 'YAML';
+
+my %ACTION = (
+   'write' => sub {
+      my ($plconfig, $config, $domain, $key, $setvalue) = @_;
+      exit_usage() if !$key || !$setvalue;
+      my $statement = $plconfig->dotscheme_to_perlvar($key);
+
+      # Try to check if the string evals,
+      # if it does it's a valid perl statement,
+      # everything else is quoted with power-quotes (')
+      eval $setvalue;
+      if ($EVAL_ERROR) {
+        $setvalue = qq{'$setvalue'};
+      }
+
+      # try the statement with a temp variable first.
+      # so we're sure it doesn't fuck up something.
+      eval_string qq{
+        my \$tmpvar  = $setvalue;
+      }; 
+      # then try the real operation
+      eval_string qq{
+         $statement = $setvalue;
+      }; 
+
+      $plconfig->save;
+   },
+   'read' => sub {
+      my ($plconfig, $config, $domain, $key) = @_;
+
+      if (defined $key) {
+         my $statement = $plconfig->dotscheme_to_perlvar($key);
+         eval_string qq{ \$value = $statement };
+         print dump_structure( { $key => $value }), "\n";
+      }
+      else {
+         print dump_structure($config), "\n";
+      }
+   },
+   'help' => sub {
+      exit_usage();
+   },
+   'rename' => sub {
+      my ($plconfig, $config, $domain, $key_from, $key_to) = @_;
+      exit_usage() if !$key_from || !$key_to;
+
+      my $from_stmt = $plconfig->dotscheme_to_perlvar($key_from);
+      my $to_stmt   = $plconfig->dotscheme_to_perlvar($key_to); 
+
+      eval_string qq{ my \$tmp = $from_stmt; $to_stmt = \$tmp; delete $from_stmt};
+
+      $plconfig->save;
+   },
+   'delete' => sub {
+      my ($plconfig, $config, $domain, $key) = @_;
+      exit_usage() if !$key;
+
+      my $key_stmt = $plconfig->dotscheme_to_perlvar($key);
+
+      eval_string qq{ delete $key_stmt };
+
+      $plconfig->save;
+   
+      return;
+   },
+);
+
+
+my $getopt_options   = {
+   style => 'GNU',
+};
+
+my $getopt_rules     = {
+   '--host|-h'    => 'string',
+   '--quiet|-q'   => 'flag',
+   '--verbose|-q' => 'flag',
+   '--output|-o'  => sub {
+        my ($getopt, $node) = @_;
+        my $next_arg = uc $getopt->get_next_arg($node);
+    
+        if (!$DUMPER{$next_arg}) {
+           die "No such output type: $next_arg\n";
+        }
+
+        $CURDUMPER = $next_arg;
+        return;
+    },
+};
+
+my $options  = getoptions($getopt_rules, $getopt_options);
+my $action   = shift @ARGV;
+my $domain   = shift @ARGV;
+exit_usage() if !$action || !$domain;
+
+
+my $host = $options->{'--host'} || 'local';
+my $plconfig = Config::PlConfig->new({
+   host           => $host,
+   domain         => $domain,
+});
+my $file = $plconfig->host->file_for_domain($domain);
+
+say_info "Using domain $domain at host $host [$file].";
+
+my $config   = $plconfig->load;
+
+$ACTION{$action}->($plconfig, $config, $domain, @ARGV);
+
+sub say_info(@;) {
+   return if      $options->{'--quiet'};
+   return if not  $options->{'--verbose'};
+   warn ">>> ", @_, "\n";
+}
+
+
+sub exit_usage {
+   my $in_usage;
+   my $usage;
+
+   LINE:
+   while (my $line = <DATA>) {
+      chomp $line;
+      if ($line =~ m/^__(.+?)__$/xms) {
+         last LINE if $in_usage;
+         if ($1 eq 'usage') {
+            $in_usage++;
+            next LINE;
+         }
+      }
+      if ($in_usage) {
+         $usage .= $line . "\n";
+      }
+   }
+
+   printf $usage, basename($PROGRAM_NAME);
+   
+   exit 0;
+}
+
+sub eval_string ($) {
+    my ($perl_code) = @_;
+    eval $perl_code; ## no critic
+    if ($EVAL_ERROR) {
+        warn $EVAL_ERROR;
+        warn "_" x 32, "\n";
+        warn ">>> EVAL: \n";
+        warn $perl_code, "\n";
+        warn "-" x 32, "\n";
+        die "\n";
+    }
+}
+
+sub dump_structure {
+    my ($data_ref) = @_;
+
+    return $DUMPER{$CURDUMPER}->($data_ref);
+}
+
+
+__END__
+
+# Local Variables:
+#   mode: cperl
+#   cperl-indent-level: 4
+#   fill-column: 78
+# End:
+# vim: expandtab tabstop=4 shiftwidth=4 shiftround
+
+__usage__
+
+Usage: %s [-o <output type> [-h <host>] followed by one of the following:
+
+    read <domain>                       shows defaults for given domain.
+    read <domain> <key>                 shows defaults for given domain, key.
+   
+    write <domain> <key> <value>        writes key for domain.
+
+    rename <domain> <old_key> <new_key> renames old_key to new_key.
+
+    delete <domain> <key>               deletes key in domain.
+
+    help                                this help.

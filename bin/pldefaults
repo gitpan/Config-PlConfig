@@ -1,0 +1,139 @@
+#!/usr/bin/perl
+# $Id$
+# $Source$
+# $Author$
+# $HeadURL$
+# $Revision$
+# $Date$
+use strict;
+use warnings;
+
+use English qw( -no_match_vars );
+use Getopt::LL qw(getoptions opt_String opt_Flag);
+use File::Basename qw(basename);
+use Config::PlConfig;
+sub say_info (@;);
+sub eval_string ($ );
+my $value;
+
+my $CURDUMPER = 'YAML';
+
+my %ACTION = (
+    'write' => sub {
+        my $plconfig = shift;
+        return $plconfig->dotscheme->write_key(@_);
+    },
+    'read' => sub {
+        my $plconfig = shift;
+        my $ret = $plconfig->dotscheme->read_keys(@_);
+        if ($ret) {
+            print $ret, "\n";
+        }
+        return $ret;
+    },
+    'rename' => sub {
+        my $plconfig = shift;
+        return $plconfig->dotscheme->rename_key(@_);
+    },
+    'delete' => sub {
+        my $plconfig = shift;
+        return $plconfig->dotscheme->delete_key(@_);
+    },
+    'help' => sub {
+        exit_usage();
+    },
+);
+
+my $getopt_options = {
+    style => 'GNU',
+};
+
+my $getopt_rules = {
+    '--host|-h'    => 'string',
+    '--quiet|-q'   => 'flag',
+    '--verbose|-v' => 'flag',
+    '--output|-o'  => sub {
+        my ( $getopt, $node ) = @_;
+        my $next_arg = uc $getopt->get_next_arg($node);
+
+        $CURDUMPER = $next_arg;
+        return;
+    },
+};
+
+my $options = getoptions( $getopt_rules, $getopt_options );
+my $action  = shift @ARGV;
+my $domain  = shift @ARGV;
+exit_usage() if !$action || !$domain;
+
+my $host = $options->{'--host'} || 'local';
+my $plconfig = Config::PlConfig->new(
+    {   host   => $host,
+        domain => $domain,
+        dumper => $CURDUMPER,
+    }
+);
+my $file = $plconfig->host->file_for_domain($domain);
+
+say_info "Using domain $domain at host $host [$file].";
+
+my $config = $plconfig->config;
+
+$ACTION{$action}->( $plconfig, @ARGV );
+if ($EVAL_ERROR) {
+    die $EVAL_ERROR, "\n";
+}
+
+sub say_info(@;) {
+    return if $options->{'--quiet'};
+    return if not $options->{'--verbose'};
+    warn ">>> ", @_, "\n";
+}
+
+sub exit_usage {
+    my $in_usage;
+    my $usage;
+
+    LINE:
+    while ( my $line = <DATA> ) {
+        chomp $line;
+        if ( $line =~ m/^__(.+?)__$/xms ) {
+            last LINE if $in_usage;
+            if ( $1 eq 'usage' ) {
+                $in_usage++;
+                next LINE;
+            }
+        }
+        if ($in_usage) {
+            $usage .= $line . "\n";
+        }
+    }
+
+    printf $usage, basename($PROGRAM_NAME);
+
+    exit 0;
+}
+
+__END__
+
+# Local Variables:
+#   mode: cperl
+#   cperl-indent-level: 4
+#   fill-column: 78
+# End:
+# vim: expandtab tabstop=4 shiftwidth=4 shiftround
+
+__usage__
+
+Usage: %s [-o <output type> [-h <host>] followed by one of the following:
+
+    read <domain>                       shows defaults for given domain.
+    read <domain> <key>                 shows defaults for given domain, key.
+   
+    write <domain> <key> <value>        writes key for domain.
+
+    rename <domain> <old_key> <new_key> renames old_key to new_key.
+
+    delete <domain> <key>               deletes key in domain.
+
+    help                                this help.

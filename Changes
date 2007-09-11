@@ -1,5 +1,12 @@
 Revision history for Config-PlConfig
 
-0.0.1  Mon Aug  6 19:35:31 2007
+0.1_02 Tue  Sep 11 11:56:12 2007
+      - Moved functionality from pldefaults to Config::PlConfig::DotScheme
+      - save() now takes a hashref to save as optional argument.
+      - Support for autosave.
+         (Global:  use Config::PlConfig qw(:autosave);
+          Lexical: $c = Config::PlConfig->new({autosave => 1 });)
+
+0.1_01  Mon Aug  6 19:35:31 2007
        Initial release.
 

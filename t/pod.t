@@ -7,8 +7,8 @@ if ($ENV{TEST_COVERAGE}) {
     plan( skip_all => 'Disabled when testing coverage.' );
 }
 
-if ( not $ENV{CLASS_DOT_MODEL_AUTHOR} ) {
-    my $msg = 'Author test.  Set $ENV{CLASS_DOT_MODEL_AUTHOR} to a true value to run.';
+if ( not $ENV{CONFIG_PLCONFIG_AUTHOR} ) {
+    my $msg = 'Author test.  Set $ENV{CONFIG_PLCONFIG_AUTHOR} to a true value to run.';
     plan( skip_all => $msg );
 }
 
